@@ -54,10 +54,11 @@ const App: React.FC = () => {
   const [assets, setAssets] = useState<GameAssets>({
     bgUrl: BG_IMAGE,
     sockUrl: SOCK_IMAGE,
-    giftUrls: {} 
+    giftUrls: {},
+    audioUrls: { bgm: null, drum: null, tada: null }
   });
   const [showSetup, setShowSetup] = useState(false);
-
+  
   // Game State
   const [gameState, setGameState] = useState<GameState>({
     socks: [],
@@ -68,38 +69,15 @@ const App: React.FC = () => {
 
   // Audio State
   const [isMuted, setIsMuted] = useState(false);
-  const [audioInitialized, setAudioInitialized] = useState(false);
   
   // Sound Refs
   const drumrollRef = useRef<HTMLAudioElement | null>(null);
   const tadaRef = useRef<HTMLAudioElement | null>(null);
   const bgmRef = useRef<HTMLAudioElement | null>(null);
 
-  // Initialization
+  // Initialize Game Data & Load Assets
   useEffect(() => {
-    // 1. Initialize Audio Objects
-    drumrollRef.current = new Audio(SOUNDS.DRUMROLL);
-    tadaRef.current = new Audio(SOUNDS.TADA);
-    bgmRef.current = new Audio(SOUNDS.BGM);
-    
-    // Configure BGM
-    if (bgmRef.current) {
-        bgmRef.current.loop = true;
-        bgmRef.current.volume = 0.3;
-        bgmRef.current.preload = 'auto';
-    }
-    // Configure SFX
-    if (drumrollRef.current) {
-        drumrollRef.current.loop = true;
-        drumrollRef.current.volume = 0.6;
-        drumrollRef.current.preload = 'auto';
-    }
-    if (tadaRef.current) {
-        tadaRef.current.volume = 1.0;
-        tadaRef.current.preload = 'auto';
-    }
-
-    // 2. Initialize Game Data
+    // 1. Initialize Game Data
     const giftIds = generateGiftDistribution(TOTAL_SOCKS);
     const initialSocks: Sock[] = Array.from({ length: TOTAL_SOCKS }, (_, i) => ({
       id: i,
@@ -108,7 +86,7 @@ const App: React.FC = () => {
     }));
     setGameState(prev => ({ ...prev, socks: initialSocks }));
 
-    // 3. Load Persistent Assets
+    // 2. Load Persistent Assets from DB
     const initAssets = async () => {
         try {
             const stored = await loadAllAssets();
@@ -117,17 +95,23 @@ const App: React.FC = () => {
                 defaultGifts[i] = getGiftImage(i);
             }
 
-            setAssets(prev => ({
+            setAssets({
                 bgUrl: stored.bgUrl || BG_IMAGE,
                 sockUrl: stored.sockUrl || SOCK_IMAGE,
-                giftUrls: { ...defaultGifts, ...stored.giftUrls }
-            }));
+                giftUrls: { ...defaultGifts, ...stored.giftUrls },
+                audioUrls: {
+                    bgm: stored.audioUrls.bgm || null,
+                    drum: stored.audioUrls.drum || null,
+                    tada: stored.audioUrls.tada || null,
+                }
+            });
         } catch (e) {
             console.error("Failed to load assets", e);
             const defaultGifts: Record<number, string> = {};
             for (let i = 1; i <= TOTAL_SOCKS; i++) {
                 defaultGifts[i] = getGiftImage(i);
             }
+            // Fallback
             setAssets(prev => ({...prev, giftUrls: defaultGifts}));
         }
     };
@@ -140,15 +124,39 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Update Audio sources when assets change
+  useEffect(() => {
+      bgmRef.current = new Audio(assets.audioUrls.bgm || SOUNDS.BGM);
+      bgmRef.current.loop = true;
+      bgmRef.current.volume = 0.3;
+      bgmRef.current.preload = 'auto';
+
+      drumrollRef.current = new Audio(assets.audioUrls.drum || SOUNDS.DRUMROLL);
+      drumrollRef.current.loop = true;
+      drumrollRef.current.volume = 0.6;
+      drumrollRef.current.preload = 'auto';
+
+      tadaRef.current = new Audio(assets.audioUrls.tada || SOUNDS.TADA);
+      tadaRef.current.volume = 1.0;
+      tadaRef.current.preload = 'auto';
+
+      if (!isMuted) {
+          bgmRef.current.play().catch(() => {});
+      }
+
+      return () => {
+          bgmRef.current?.pause();
+          drumrollRef.current?.pause();
+          tadaRef.current?.pause();
+      }
+  }, [assets.audioUrls, isMuted]);
+
   // Audio Unlock / Play Handler
   const tryPlayAudio = useCallback(() => {
     if (isMuted) return;
 
-    // Initialize/Resume BGM
     if (bgmRef.current && bgmRef.current.paused) {
-        bgmRef.current.play().then(() => {
-            setAudioInitialized(true);
-        }).catch(e => console.log("BGM autoplay prevented:", e));
+        bgmRef.current.play().catch(e => console.log("BGM autoplay prevented:", e));
     }
   }, [isMuted]);
 
@@ -261,14 +269,18 @@ const App: React.FC = () => {
         {/* Aspect Ratio Box */}
         <div 
             className="relative w-full max-w-[180vh] aspect-[18/9] bg-cover bg-center shadow-2xl overflow-hidden"
-            style={{ backgroundImage: `url(${assets.bgUrl})` }}
+            style={{ 
+                // Just try to show the background. If it fails, it fails (shows background color), 
+                // but we don't actively hide it with logic anymore.
+                backgroundImage: `url(${assets.bgUrl})`,
+            }}
         >
-            {/* Fallback background color */}
-            <div className="absolute inset-0 bg-[#1a1c2c] -z-10" />
+            {/* Fallback background color/gradient if image fails to load/is transparent */}
+            <div className={`absolute inset-0 -z-10 bg-[#1a1c2c]`} />
             <div className="absolute inset-0 bg-black/20" />
             <Snowfall />
 
-            {/* Header Text - Adjusted to fit 1 line: Reduced size slightly, added tracking-tighter and nowrap */}
+            {/* Header Text */}
             <div className="absolute top-[3%] left-0 w-full text-center z-10 px-2 pointer-events-none">
                 <p className="text-white text-base md:text-2xl lg:text-3xl font-bold mb-1 pixel-shadow text-yellow-100 whitespace-nowrap tracking-tight">
                     2025년 힘내서 달려오신 선생님께 감사하며 선물을 준비했어요!
@@ -278,12 +290,13 @@ const App: React.FC = () => {
                 </h1>
             </div>
 
-            {/* Settings Button */}
+            {/* Settings Button - Highlighted so user knows they can fix things */}
             <button 
                 onClick={(e) => { e.stopPropagation(); setShowSetup(true); }}
-                className="absolute top-4 right-4 z-50 p-2 bg-black/50 text-white rounded hover:bg-white/20 transition-colors pointer-events-auto"
+                className="absolute top-4 right-4 z-50 p-2 bg-black/50 text-white rounded hover:bg-white/20 transition-colors pointer-events-auto border border-white/30"
+                title="설정: 배경/음악/선물 수정"
             >
-                ⚙️
+                ⚙️ 설정
             </button>
 
             {/* Sound Toggle Button */}
