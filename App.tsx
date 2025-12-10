@@ -261,6 +261,36 @@ const App: React.FC = () => {
         />
       )}
       
+      {/* Game Completion Overlay */}
+      {gameState.currentGift === null && gameState.openedCount === TOTAL_SOCKS && (
+        <div 
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/95 animate-fade-in p-4 text-center select-none"
+            onClick={() => {
+                if(confirm("게임을 처음부터 다시 시작하시겠습니까?")) {
+                    window.location.reload();
+                }
+            }}
+        >
+             <div className="space-y-6 md:space-y-10 z-10">
+                <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-yellow-400 pixel-shadow leading-relaxed animate-pulse">
+                    2026년에도<br/>전교조가 함께합니다!
+                </h2>
+                <p className="text-xl md:text-3xl lg:text-4xl text-white pixel-shadow leading-relaxed">
+                    변호사보다 든든하고,<br/>
+                    OTT보다 더 재밌는
+                </p>
+                <div className="text-5xl md:text-7xl lg:text-8xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-pink-600 pixel-shadow animate-bounce mt-8" style={{ textShadow: '4px 4px 0px #fff' }}>
+                    전교조 화이팅!
+                </div>
+             </div>
+             <p className="absolute bottom-10 text-gray-500 text-sm md:text-base animate-pulse z-10">
+                (화면을 누르면 다시 시작합니다)
+             </p>
+             {/* Snowfall background for the ending screen */}
+             <Snowfall /> 
+        </div>
+      )}
+
       {/* Main Game Container - Touch anywhere to start audio */}
       <div 
         className="relative w-screen h-screen overflow-hidden flex items-center justify-center bg-black scanlines"
