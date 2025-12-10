@@ -31,16 +31,33 @@ export const saveAsset = async (key: string, file: Blob) => {
   });
 };
 
+export const clearAllAssets = async () => {
+    const db = await getDB();
+    return new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.clear();
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+};
+
 export const loadAllAssets = async () => {
   const db = await getDB();
-  return new Promise<{ bgUrl: string | null, sockUrl: string | null, giftUrls: Record<number, string> }>((resolve, reject) => {
+  return new Promise<{ 
+      bgUrl: string | null, 
+      sockUrl: string | null, 
+      giftUrls: Record<number, string>,
+      audioUrls: { bgm: string | null, drum: string | null, tada: string | null }
+  }>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
     
     const result = {
         bgUrl: null as string | null,
         sockUrl: null as string | null,
-        giftUrls: {} as Record<number, string>
+        giftUrls: {} as Record<number, string>,
+        audioUrls: { bgm: null, drum: null, tada: null } as { bgm: string|null, drum: string|null, tada: string|null }
     };
 
     const request = store.openCursor();
@@ -53,6 +70,9 @@ export const loadAllAssets = async () => {
             
             if (key === 'bg') result.bgUrl = url;
             else if (key === 'sock') result.sockUrl = url;
+            else if (key === 'audio_bgm') result.audioUrls.bgm = url;
+            else if (key === 'audio_drum') result.audioUrls.drum = url;
+            else if (key === 'audio_tada') result.audioUrls.tada = url;
             else if (key.startsWith('gift_')) {
                 const id = parseInt(key.replace('gift_', ''), 10);
                 if (!isNaN(id)) {
