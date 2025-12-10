@@ -15,4 +15,9 @@ export interface GameAssets {
   bgUrl: string;
   sockUrl: string;
   giftUrls: Record<number, string>; // Map gift ID to image URL
+  audioUrls: {
+    bgm: string | null;
+    drum: string | null;
+    tada: string | null;
+  };
 }
